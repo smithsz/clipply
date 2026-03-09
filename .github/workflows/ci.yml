@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    name: SwiftLint
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install SwiftLint
+      run: brew install swiftlint
+    
+    - name: Run SwiftLint
+      run: swiftlint lint --strict
+
+  test:
+    name: Unit Tests
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Check for test target
+      id: check_tests
+      run: |
+        if xcodebuild -list -project Clipply.xcodeproj | grep -q "ClipplyTests"; then
+          echo "has_tests=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_tests=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Build and Test
+      if: steps.check_tests.outputs.has_tests == 'true'
+      run: |
+        xcodebuild clean build test \
+          -project Clipply.xcodeproj \
+          -scheme Clipply \
+          -destination 'platform=macOS' \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO
+    
+    - name: Build Only (no test target)
+      if: steps.check_tests.outputs.has_tests == 'false'
+      run: |
+        echo "⚠️ No test target found. Building project only."
+        xcodebuild clean build \
+          -project Clipply.xcodeproj \
+          -scheme Clipply \
+          -destination 'platform=macOS' \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO
